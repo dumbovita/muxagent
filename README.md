@@ -53,7 +53,7 @@ Run parallel **Antigravity CLI (`agy`)** agents in visible **`cmux`** tabs, orch
 2. **Briefing:** For each lane, Codex generates a `brief.md` containing acceptance criteria and boundaries.
 3. **Execution:** Codex spins up a new tab via `cmux new-surface`, titles it, and runs `scripts/run-lane`.
 4. **Monitoring:** Each lane outputs its live terminal feed in its own `cmux` tab and updates `status` (`queued`, `running`, `succeeded`, `failed`).
-5. **Notification & Verification:** Upon completion, `cmux notify` sends a notification. Codex reads `result.md`, inspects changes, and verifies integration.
+5. **Notification, Verification & Cleanup:** Upon completion, `cmux notify` sends a notification. Codex reads `result.md`, inspects changes, verifies integration, and closes the tab with `cmux close-surface` (preserving tabs only for failed lanes).
 
 ---
 

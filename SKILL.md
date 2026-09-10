@@ -108,13 +108,21 @@ Interrupt only a recorded lane:
 cmux send-key --workspace <workspace-uuid> --surface <surface-uuid> ctrl+c
 ```
 
-After `succeeded`, read the lane's `result.md`. Treat it as a claim: inspect changes or commits and rerun the relevant acceptance check in Codex. Integrate reviewed worktree commits deliberately, then run the final repository-wide gate from the integrated tree. Report failed lanes and preserve their tabs and artifacts for diagnosis.
+After `succeeded`, read the lane's `result.md`. Treat it as a claim: inspect changes or commits and rerun the relevant acceptance check in Codex. Integrate reviewed worktree commits deliberately, then run the final repository-wide gate from the integrated tree.
+
+Once verification and integration are complete, close the surface for each completed lane:
+
+```bash
+cmux close-surface --workspace <workspace-uuid> --surface <surface-uuid>
+```
+
+Report failed lanes and preserve their tabs and artifacts for diagnosis.
 
 ## Verified cmux contract
 
 - A surface is a tab inside a pane. `new-surface` adds one to the explicitly targeted workspace and pane.
 - `--focus false` preserves the user's attention. Mutating commands should use stable UUID targets.
-- `send` submits text to a terminal; `read-screen` reads its visible or scrolled output; `surface-health` diagnoses terminal state; `notify` reports completion.
+- `send` submits text to a terminal; `read-screen` reads its visible or scrolled output; `surface-health` diagnoses terminal state; `notify` reports completion; `close-surface` closes completed tabs.
 - cmux restores layout and scrollback, not arbitrary live process state, so results and status are persisted outside the tab.
 
 If installed behavior differs, consult `cmux <command> --help` and `cmux capabilities --json`. Sources: [official cmux CLI contract](https://github.com/manaflow-ai/cmux/blob/main/docs/cli-contract.md), [official workspace command reference](https://github.com/manaflow-ai/cmux/blob/main/skills/cmux-workspace/references/commands.md), [official session restore guide](https://cmux.com/docs/session-restore), and [Antigravity headless permissions](https://www.agy.dev/docs/cli/headless/).
