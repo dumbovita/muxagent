@@ -1,0 +1,58 @@
+#!/usr/bin/env bash
+
+set -u
+
+if (($# != 3)); then
+  printf 'Usage: run-lane LANE_DIR MODE TIMEOUT\n' >&2
+  exit 2
+fi
+
+lane_dir="$1"
+mode="$2"
+timeout="$3"
+
+if [[ ! -d "$lane_dir" || ! -f "$lane_dir/brief.md" ]]; then
+  printf 'run-lane: missing lane directory or brief: %s\n' "$lane_dir" >&2
+  exit 2
+fi
+
+if [[ "$mode" != plan && "$mode" != accept-edits ]]; then
+  printf 'run-lane: mode must be plan or accept-edits\n' >&2
+  exit 2
+fi
+
+on_interrupt() {
+  printf '%s\n' interrupted > "$lane_dir/status"
+  cmux notify --title "muxagent: ${lane_dir##*/}" --body "Interrupted" >/dev/null 2>&1 || true
+  exit 130
+}
+trap on_interrupt INT TERM
+
+printf '%s\n' running > "$lane_dir/status"
+
+agy --new-project --add-dir . \
+  --model gemini-3.8-flash-high \
+  --mode "$mode" \
+  --sandbox \
+  --dangerously-skip-permissions \
+  --print-timeout "$timeout" \
+  -p "$(<"$lane_dir/brief.md")" > "$lane_dir/result.md"
+exit_code=$?
+
+cat "$lane_dir/result.md"
+
+if ((exit_code == 0)) && [[ ! -s "$lane_dir/result.md" ]]; then
+  printf 'run-lane: agy exited without producing a result\n' >&2
+  exit_code=1
+fi
+
+if ((exit_code == 0)); then
+  printf '%s\n' succeeded > "$lane_dir/status"
+  notification="Completed successfully"
+else
+  printf 'failed:%s\n' "$exit_code" > "$lane_dir/status"
+  notification="Failed with exit code $exit_code"
+fi
+
+cmux notify --title "muxagent: ${lane_dir##*/}" --body "$notification" >/dev/null 2>&1 || true
+exit "$exit_code"

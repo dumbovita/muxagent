@@ -1,0 +1,120 @@
+---
+name: muxagent
+description: Delegate tasks from Codex to parallel Antigravity CLI (agy) agents running in visible cmux tabs. Use when asked to run parallel agent tabs or orchestrate work via cmux.
+---
+
+# Muxagent
+
+Codex is the orchestrator. Delegates run as foreground `agy` processes in separate cmux terminal surfaces (tabs) inside the caller's current workspace and pane. Codex owns decomposition, monitoring, verification, and integration.
+
+## Preconditions
+
+Run:
+
+```bash
+cmux ping
+cmux --json --id-format both identify
+```
+
+Require a live cmux socket and a non-null `caller`. Capture the stable `caller.workspace_id` and `caller.pane_id` UUIDs; refs are display-only. Never substitute the visually focused workspace or pane.
+
+This installation intentionally runs delegated agents without interactive approval prompts. The lane runner combines `--sandbox` with `--dangerously-skip-permissions`: Antigravity auto-approves the headless agent's tools while terminal commands remain inside its OS sandbox. `plan` and `accept-edits` still control whether the lane may modify project files. Keep each lane's working directory and additional directory access limited to its authorized workspace or worktree.
+
+Install the bundled [Codex rule](rules/muxagent.rules) at `~/.codex/rules/muxagent.rules` and restart Codex once. The rule allows `cmux` commands to run outside the Codex sandbox without repeated prompts; it does not change approval behavior for other commands.
+
+## Choose lanes
+
+Delegate only work that can progress independently: repository mapping, focused investigation, disjoint implementation, tests, or independent review. Keep cross-cutting decisions, final verification, and integration in Codex.
+
+Use this fixed routing table:
+
+| Work | Model |
+| --- | --- |
+| Repository exploration, search, dependency mapping, and data-flow analysis | `gemini-3.8-flash-high` |
+| Code implementation, refactoring, and migration | `gemini-3.8-flash-high` |
+| Debugging, root-cause analysis, and performance investigation | `gemini-3.8-flash-high` |
+| Architecture, design evaluation, and complex reasoning | `gemini-3.8-flash-high` |
+| Code, security, and regression review | `gemini-3.8-flash-high` |
+| Test planning, generation, and failure analysis | `gemini-3.8-flash-high` |
+| Technical research, source synthesis, and documentation | `gemini-3.8-flash-high` |
+| Tool-heavy agentic coding, validation, and integration support | `gemini-3.8-flash-high` |
+
+This assignment is fixed as of September 10, 2026. Among the eligible models exposed by `agy`, the high-effort Gemini 3.8 variant has the strongest overall intelligence, coding-agent, scientific-code, long-context, and reasoning evidence across [Artificial Analysis](https://artificialanalysis.ai/models/gemini-3-8-flash/), [Arena Text](https://arena.ai/leaderboard), [Arena Code](https://arena.ai/leaderboard/code), [Terminal-Bench 4.0](https://snorkel.ai/leaderboard/terminal-bench-4-0/), and the independent [BenchmarkList aggregation](https://benchmarklist.com/models/google-gemini-3.8-flash/). Quality is the priority, so lower-effort variants are not used merely to reduce latency or cost.
+
+## Isolate writes
+
+Use `plan` mode for exploration and review, and put `Do not modify files` in the brief. Verify afterward that nothing changed.
+
+Use `accept-edits` only for authorized write lanes:
+
+- Share a working tree only when every lane has disjoint owned paths. Briefs must name owned and forbidden paths; delegates must not run repository-wide formatters or Git commands.
+- Use a Git worktree per lane for overlapping ownership, broad edits, or alternative implementations. Start all worktrees from one recorded base commit. Ask each delegate for one commit, then inspect and integrate selected commits in dependency order.
+
+Never let multiple writers share unpartitioned ownership. Preserve worktrees until their results are verified and integrated.
+
+## Prepare briefs and state
+
+Create one temporary run directory and one lane directory per delegate:
+
+```bash
+MUX_RUN_DIR="$(mktemp -d "${TMPDIR:-/tmp}/muxagent.XXXXXX")"
+mkdir -p "$MUX_RUN_DIR/api-review"
+printf '%s\n' queued > "$MUX_RUN_DIR/api-review/status"
+```
+
+Write the lane's complete contract to `brief.md`. Include the outcome, necessary context, exact working directory, ownership boundaries, an observable acceptance criterion, and a request for a concise final report containing findings or changed files, validation result, and blockers. Do not include secrets or rely on conversation history.
+
+## Launch each tab
+
+Resolve the absolute path to this skill's `scripts/run-lane`, then create a terminal surface with explicit placement and no focus change:
+
+```bash
+MUXAGENT_RUNNER="/absolute/path/to/muxagent/scripts/run-lane"
+cmux --id-format uuids new-surface \
+  --workspace <workspace-uuid> \
+  --pane <pane-uuid> \
+  --type terminal \
+  --working-directory /absolute/path/to/lane-worktree \
+  --focus false
+```
+
+Record the returned surface UUID in the lane directory. Then name that exact tab and send it the foreground lane command, quoting the resolved runner and lane paths:
+
+```bash
+cmux rename-tab --workspace <workspace-uuid> --surface <surface-uuid> --title "muxagent: api-review"
+cmux send --workspace <workspace-uuid> --surface <surface-uuid> -- \
+  "\"$MUXAGENT_RUNNER\" \"$MUX_RUN_DIR/api-review\" plan 30m\n"
+```
+
+Create and start independent tabs without sleeps. The two-step `new-surface` plus `send` sequence makes the surface identity explicit before any work is submitted.
+
+Do not create another cmux workspace or window, alter focus, move a surface, or launch a hidden/background process. Only act on surface UUIDs recorded for the current run.
+
+## Monitor and collect
+
+Read lane status and terminal output at useful milestones:
+
+```bash
+for lane in "$MUX_RUN_DIR"/*; do printf '%s: ' "${lane##*/}"; cat "$lane/status"; done
+cmux read-screen --workspace <workspace-uuid> --surface <surface-uuid> --lines 80
+cmux surface-health --workspace <workspace-uuid> --json
+```
+
+Status is `queued`, `running`, `succeeded`, `failed:<code>`, or `interrupted`. If a lane appears stalled or reports success without its acceptance evidence, inspect its tab. Retry only with a corrected, narrowly scoped brief.
+
+Interrupt only a recorded lane:
+
+```bash
+cmux send-key --workspace <workspace-uuid> --surface <surface-uuid> ctrl+c
+```
+
+After `succeeded`, read the lane's `result.md`. Treat it as a claim: inspect changes or commits and rerun the relevant acceptance check in Codex. Integrate reviewed worktree commits deliberately, then run the final repository-wide gate from the integrated tree. Report failed lanes and preserve their tabs and artifacts for diagnosis.
+
+## Verified cmux contract
+
+- A surface is a tab inside a pane. `new-surface` adds one to the explicitly targeted workspace and pane.
+- `--focus false` preserves the user's attention. Mutating commands should use stable UUID targets.
+- `send` submits text to a terminal; `read-screen` reads its visible or scrolled output; `surface-health` diagnoses terminal state; `notify` reports completion.
+- cmux restores layout and scrollback, not arbitrary live process state, so results and status are persisted outside the tab.
+
+If installed behavior differs, consult `cmux <command> --help` and `cmux capabilities --json`. Sources: [official cmux CLI contract](https://github.com/manaflow-ai/cmux/blob/main/docs/cli-contract.md), [official workspace command reference](https://github.com/manaflow-ai/cmux/blob/main/skills/cmux-workspace/references/commands.md), [official session restore guide](https://cmux.com/docs/session-restore), and [Antigravity headless permissions](https://www.agy.dev/docs/cli/headless/).

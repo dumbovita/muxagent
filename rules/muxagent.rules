@@ -1,0 +1,5 @@
+prefix_rule(
+    pattern = ["cmux"],
+    decision = "allow",
+    justification = "Muxagent uses cmux to create, control, and monitor delegated agent tabs.",
+)

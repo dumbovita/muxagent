@@ -1,0 +1,4 @@
+interface:
+  display_name: "Muxagent"
+  short_description: "Run parallel agy agents in cmux tabs"
+  default_prompt: "Use $muxagent to delegate independent work into visible cmux tabs and integrate the verified results."
