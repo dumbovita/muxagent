@@ -18,9 +18,11 @@ cmux --json --id-format both identify
 
 Require a live cmux socket and a non-null `caller`. Capture the stable `caller.workspace_id` and `caller.pane_id` UUIDs; refs are display-only. Never substitute the visually focused workspace or pane.
 
-This installation intentionally runs delegated agents without interactive approval prompts. The lane runner combines `--sandbox` with `--dangerously-skip-permissions`: Antigravity auto-approves the headless agent's tools while terminal commands remain inside its OS sandbox. `plan` and `accept-edits` still control whether the lane may modify project files. Keep each lane's working directory and additional directory access limited to its authorized workspace or worktree.
+This installation runs without interactive approval prompts:
 
-Install the bundled [Codex rule](rules/muxagent.rules) at `~/.codex/rules/muxagent.rules` and restart Codex once. The rule allows `cmux` commands to run outside the Codex sandbox without repeated prompts; it does not change approval behavior for other commands.
+- **Codex commands:** Install the bundled [Codex rule](rules/muxagent.rules) at `~/.codex/rules/muxagent.rules` and restart Codex once. All `cmux` commands are pre-approved by this exec policy. Never request escalation (`sandbox_permissions: "require_escalated"`) or prompt the user for approval when executing `cmux` commands. Execute them directly as standard commands without confirmation prompts.
+- **Command invocation:** Execute each `cmux` command individually or chain with `&&`. Do not batch commands using raw newlines (`\n`) inside a single command string, ensuring every command segment begins with `cmux` to match the prefix rule.
+- **Delegated `agy` workers:** The lane runner combines `--sandbox` with `--dangerously-skip-permissions`: Antigravity auto-approves headless agent tools while terminal commands remain inside its OS sandbox. `plan` and `accept-edits` still control whether the lane may modify project files. Keep each lane's working directory and additional directory access limited to its authorized workspace or worktree.
 
 ## Choose lanes
 

@@ -3,3 +3,9 @@ prefix_rule(
     decision = "allow",
     justification = "Muxagent uses cmux to create, control, and monitor delegated agent tabs.",
 )
+
+prefix_rule(
+    pattern = ["/Applications/cmux.app/Contents/Resources/bin/cmux"],
+    decision = "allow",
+    justification = "Muxagent uses cmux via absolute path to create, control, and monitor delegated agent tabs.",
+)
