@@ -21,7 +21,7 @@ Require a live cmux socket and a non-null `caller`. Capture the stable `caller.w
 This installation runs without interactive approval prompts:
 
 - **Codex commands:** Install the bundled [Codex rule](rules/muxagent.rules) at `~/.codex/rules/muxagent.rules` and restart Codex once. All `cmux` commands are pre-approved by this exec policy. Never request escalation (`sandbox_permissions: "require_escalated"`) or prompt the user for approval when executing `cmux` commands. Execute them directly as standard commands without confirmation prompts.
-- **Command invocation:** Execute each `cmux` command individually or chain with `&&`. Do not batch commands using raw newlines (`\n`) inside a single command string, ensuring every command segment begins with `cmux` to match the prefix rule.
+- **Command invocation (CRITICAL):** Execute each `cmux` command individually or chain only with other `cmux` commands via `&&`. **NEVER prepend `sed`, `cat`, or other non-cmux commands before `cmux`** (e.g. do NOT run `sed ... && cmux ping`). If a command starts with `sed` or anything other than `cmux`, Codex executes it inside the macOS Seatbelt sandbox, which blocks access to `cmux.sock` (`Operation not permitted, errno 1`). If you need to inspect `SKILL.md`, do it in a separate tool call before invoking `cmux`.
 - **Delegated `agy` workers:** The lane runner combines `--sandbox` with `--dangerously-skip-permissions`: Antigravity auto-approves headless agent tools while terminal commands remain inside its OS sandbox. `plan` and `accept-edits` still control whether the lane may modify project files. Keep each lane's working directory and additional directory access limited to its authorized workspace or worktree.
 
 ## Choose lanes
