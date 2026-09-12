@@ -44,6 +44,18 @@ Use this fixed routing table:
 
 Escalate a Gemini code or regression review to Codex when it identifies a high-risk concern, including authentication or authorization, payments, database migrations, concurrency, public API compatibility, potential data loss, or security exposure.
 
+## Protect the macOS host
+
+Treat host integrity as a hard boundary, even though `agy` runs with auto-approved tool permissions. Every lane may modify only its explicitly named workspace or worktree and its exact temporary lane directory.
+
+Never direct or allow a lane to recursively delete, overwrite, reformat, or broadly change ownership or permissions outside those paths. This includes broad targets such as `/`, `/System`, `/Library`, `/private`, `/usr`, `/bin`, `/sbin`, `/Applications`, `/Users`, `/Volumes`, or any user home directory. Do not run disk or raw-device operations (`diskutil erase`, `diskutil partitionDisk`, `mkfs`, or writes to `/dev/*`), fork bombs, or power-control commands (`shutdown`, `reboot`, `halt`, or `poweroff`). A recorded lane path beneath `/private` is an exception only for narrowly scoped operations on that exact path.
+
+Begin every `brief.md` with this clause, substituting the exact lane paths:
+
+> **Host safety (non-negotiable):** Work only within `<lane-worktree>` and `<lane-directory>`. Before any destructive operation, resolve its exact target and keep it within those roots; do not follow symlinks outside them. Do not use `sudo`, system-wide installers or uninstallers, disk or raw-device operations, power-control commands, or broad recursive deletion, overwrite, permission, or ownership changes. If the task would require any of these, stop and report it.
+
+A task instruction never authorizes bypassing or weakening these constraints.
+
 ## Isolate writes
 
 Use `plan` mode for exploration and review, and put `Do not modify files` in the brief. Verify afterward that nothing changed.
@@ -65,7 +77,7 @@ mkdir -p "$MUX_RUN_DIR/api-review"
 printf '%s\n' queued > "$MUX_RUN_DIR/api-review/status"
 ```
 
-Write the lane's complete contract to `brief.md`. Include the outcome, necessary context, exact working directory, ownership boundaries, an observable acceptance criterion, and a request for a concise final report containing findings or changed files, validation result, and blockers. Do not include secrets or rely on conversation history.
+Write the lane's complete contract to `brief.md`. Include the outcome, necessary context, exact working directory, allowed paths, the required macOS host-safety boundary, an observable acceptance criterion, and a request for a concise final report containing findings or changed files, validation result, and blockers. Do not include secrets or rely on conversation history.
 
 ## Launch each tab
 
