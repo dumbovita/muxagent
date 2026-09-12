@@ -68,4 +68,4 @@ Run parallel **Antigravity CLI (`agy`)** agents in visible **`cmux`** tabs, orch
 
 ## License
 
-MIT
+[MIT](LICENSE)
