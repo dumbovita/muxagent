@@ -33,15 +33,16 @@ Use this fixed routing table:
 | Work | Model |
 | --- | --- |
 | Repository exploration, search, dependency mapping, and data-flow analysis | `gemini-3.8-flash-high` |
-| Code implementation, refactoring, and migration | `gemini-3.8-flash-high` |
-| Debugging, root-cause analysis, and performance investigation | `gemini-3.8-flash-high` |
-| Architecture, design evaluation, and complex reasoning | `gemini-3.8-flash-high` |
-| Code, security, and regression review | `gemini-3.8-flash-high` |
+| Code implementation, refactoring, and migration | Let Codex handle |
+| Debugging, root-cause analysis, and performance investigation | Let Codex handle |
+| Architecture, design evaluation, and heavy or complex reasoning | Let Codex handle |
+| Code and regression review | `gemini-3.8-flash-high` |
+| Security review and security-sensitive changes | Let Codex handle |
 | Test planning, generation, and failure analysis | `gemini-3.8-flash-high` |
 | Technical research, source synthesis, and documentation | `gemini-3.8-flash-high` |
-| Tool-heavy agentic coding, validation, and integration support | `gemini-3.8-flash-high` |
+| Tool-heavy agentic coding, validation, and integration support | Let Codex handle |
 
-This assignment is fixed as of September 10, 2026. Among the eligible models exposed by `agy`, the high-effort Gemini 3.8 variant has the strongest overall intelligence, coding-agent, scientific-code, long-context, and reasoning evidence across [Artificial Analysis](https://artificialanalysis.ai/models/gemini-3-8-flash/), [Arena Text](https://arena.ai/leaderboard), [Arena Code](https://arena.ai/leaderboard/code), [Terminal-Bench 4.0](https://snorkel.ai/leaderboard/terminal-bench-4-0/), and the independent [BenchmarkList aggregation](https://benchmarklist.com/models/google-gemini-3.8-flash/). Quality is the priority, so lower-effort variants are not used merely to reduce latency or cost.
+Escalate a Gemini code or regression review to Codex when it identifies a high-risk concern, including authentication or authorization, payments, database migrations, concurrency, public API compatibility, potential data loss, or security exposure.
 
 ## Isolate writes
 
@@ -76,16 +77,15 @@ cmux --id-format uuids new-surface \
   --workspace <workspace-uuid> \
   --pane <pane-uuid> \
   --type terminal \
-  --working-directory /absolute/path/to/lane-worktree \
   --focus false
 ```
 
 Record the returned surface UUID in the lane directory. Then name that exact tab and send it the foreground lane command, quoting the resolved runner and lane paths:
 
 ```bash
-cmux rename-tab --workspace <workspace-uuid> --surface <surface-uuid> --title "muxagent: api-review"
+cmux rename-tab --workspace <workspace-uuid> --surface <surface-uuid> "muxagent: api-review"
 cmux send --workspace <workspace-uuid> --surface <surface-uuid> -- \
-  "\"$MUXAGENT_RUNNER\" \"$MUX_RUN_DIR/api-review\" plan 30m\n"
+  "cd /absolute/path/to/lane-worktree && \"$MUXAGENT_RUNNER\" \"$MUX_RUN_DIR/api-review\" plan 30m\n"
 ```
 
 Create and start independent tabs without sleeps. The two-step `new-surface` plus `send` sequence makes the surface identity explicit before any work is submitted.
