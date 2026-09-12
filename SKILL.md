@@ -21,7 +21,7 @@ Require a live cmux socket and a non-null `caller`. Capture the stable `caller.w
 This installation runs without interactive approval prompts:
 
 - **Codex commands:** Install the bundled [Codex rule](rules/muxagent.rules) at `~/.codex/rules/muxagent.rules` and restart Codex once. All `cmux` commands are pre-approved by this exec policy. Never request escalation (`sandbox_permissions: "require_escalated"`) or prompt the user for approval when executing `cmux` commands. Execute them directly as standard commands without confirmation prompts.
-- **Command invocation (CRITICAL):** Execute each `cmux` command individually or chain only with other `cmux` commands via `&&`. **NEVER prepend `sed`, `cat`, or other non-cmux commands before `cmux`** (e.g. do NOT run `sed ... && cmux ping`). If a command starts with `sed` or anything other than `cmux`, Codex executes it inside the macOS Seatbelt sandbox, which blocks access to `cmux.sock` (`Operation not permitted, errno 1`). If you need to inspect `SKILL.md`, do it in a separate tool call before invoking `cmux`.
+- **Command invocation (CRITICAL):** Execute each `cmux` command individually or chain only with other `cmux` commands via `&&`. **NEVER prepend `sed`, `cat`, or other non-cmux commands before `cmux`** (e.g. do NOT run `sed ... && cmux ping`). If a command starts with `sed` or anything other than `cmux`, Codex executes it inside the macOS Seatbelt sandbox, which blocks access to `cmux.sock` (`Operation not permitted, errno 1`). If you need to inspect `SKILL.md`, do it in a separate tool call before invoking `cmux`. Similarly, avoid nested shell operators like `&&` inside the payload text passed to `cmux send`.
 - **Delegated `agy` workers:** The lane runner combines `--sandbox` with `--dangerously-skip-permissions`: Antigravity auto-approves headless agent tools while terminal commands remain inside its OS sandbox. `plan` and `accept-edits` still control whether the lane may modify project files. Keep each lane's working directory and additional directory access limited to its authorized workspace or worktree.
 
 ## Choose lanes
@@ -69,7 +69,7 @@ Never let multiple writers share unpartitioned ownership. Preserve worktrees unt
 
 ## Prepare briefs and state
 
-Create one temporary run directory and one lane directory per delegate:
+Create one temporary run directory and one lane directory per delegate using standard shell commands:
 
 ```bash
 MUX_RUN_DIR="$(mktemp -d "${TMPDIR:-/tmp}/muxagent.XXXXXX")"
@@ -77,7 +77,23 @@ mkdir -p "$MUX_RUN_DIR/api-review"
 printf '%s\n' queued > "$MUX_RUN_DIR/api-review/status"
 ```
 
-Write the lane's complete contract to `brief.md`. Include the outcome, necessary context, exact working directory, allowed paths, the required macOS host-safety boundary, an observable acceptance criterion, and a request for a concise final report containing findings or changed files, validation result, and blockers. Do not include secrets or rely on conversation history.
+> **Automated execution (Zero approval prompts):** Write `brief.md` and state files **exclusively using shell redirection** (`cat << 'EOF' > "$MUX_RUN_DIR/api-review/brief.md"`). **NEVER use `apply_patch`** to create or write files in `$MUX_RUN_DIR`. In Codex, using `apply_patch` on paths outside the project workspace triggers interactive confirmation prompts, breaking automated orchestration. Writing to `/private/tmp` via shell runs automatically without prompts because `/private/tmp` is an authorized writable root.
+
+### Quality Brief Contract
+
+Write a complete, high-fidelity contract to `brief.md` using `cat << 'EOF' > "$MUX_RUN_DIR/<lane>/brief.md"`. High-quality briefs produce high-quality delegate results. Structure every brief with:
+
+1. **Host safety clause (non-negotiable):** Begin with the exact host safety text shown in the section above.
+2. **Outcome & Scope:** State the single primary objective, exact files or modules to inspect/modify, and explicit out-of-scope boundaries.
+3. **Context & Anchors:** Provide essential architectural facts, known constraints, relevant commits, and exact file paths so the delegate starts with clear grounding.
+4. **Execution Protocol:**
+   - For `plan` lanes: Read-only deep analysis. Trace logic, verify against source, inspect line numbers, formulate testable hypotheses, and state `Do not modify files`.
+   - For `accept-edits` lanes: Explicitly list owned files and forbidden paths. Require targeted diffs and local verification (tests/compilation) before completion.
+5. **Standardized Report Specification (`result.md`):** Instruct the delegate to write its final report in `result.md` structured as:
+   - *Summary of Findings / Changes*: Concise executive overview.
+   - *Detailed Evidence*: Specific code references, file paths, and line numbers.
+   - *Verification*: Exact commands executed and acceptance check results.
+   - *Blockers & Next Steps*: Concrete risks or dependencies requiring Codex integration.
 
 ## Launch each tab
 
@@ -92,13 +108,21 @@ cmux --id-format uuids new-surface \
   --focus false
 ```
 
-Record the returned surface UUID in the lane directory. Then name that exact tab and send it the foreground lane command, quoting the resolved runner and lane paths:
+Record the returned surface UUID in the lane directory using `printf` (do NOT use `apply_patch`):
+
+```bash
+printf '%s\n' "<surface-uuid>" > "$MUX_RUN_DIR/api-review/surface_id"
+```
+
+Then rename that exact tab and send it the foreground lane command. **Execute `rename-tab` and `send` as separate individual commands** (do not chain them with `&&` or put `&&` inside the payload string):
 
 ```bash
 cmux rename-tab --workspace <workspace-uuid> --surface <surface-uuid> "muxagent: api-review"
 cmux send --workspace <workspace-uuid> --surface <surface-uuid> -- \
-  "cd /absolute/path/to/lane-worktree && \"$MUXAGENT_RUNNER\" \"$MUX_RUN_DIR/api-review\" plan 30m\n"
+  "\"$MUXAGENT_RUNNER\" \"$MUX_RUN_DIR/api-review\" \"/absolute/path/to/lane-worktree\" plan 30m\n"
 ```
+
+Notice `run-lane` accepts the working directory directly as its second argument (`run-lane LANE_DIR WORKDIR MODE TIMEOUT`), avoiding shell chaining (`cd ... &&`) inside `cmux send`.
 
 Create and start independent tabs without sleeps. The two-step `new-surface` plus `send` sequence makes the surface identity explicit before any work is submitted.
 

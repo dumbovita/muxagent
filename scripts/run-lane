@@ -2,14 +2,20 @@
 
 set -u
 
-if (($# != 3)); then
-  printf 'Usage: run-lane LANE_DIR MODE TIMEOUT\n' >&2
+if (($# == 4)); then
+  lane_dir="$1"
+  workdir="$2"
+  mode="$3"
+  timeout="$4"
+  cd "$workdir" || exit 2
+elif (($# == 3)); then
+  lane_dir="$1"
+  mode="$2"
+  timeout="$3"
+else
+  printf 'Usage: run-lane LANE_DIR [WORKDIR] MODE TIMEOUT\n' >&2
   exit 2
 fi
-
-lane_dir="$1"
-mode="$2"
-timeout="$3"
 
 if [[ ! -d "$lane_dir" || ! -f "$lane_dir/brief.md" ]]; then
   printf 'run-lane: missing lane directory or brief: %s\n' "$lane_dir" >&2
